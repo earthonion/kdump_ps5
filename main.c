@@ -10,73 +10,7 @@
 
 #define ALIGN_UP(addr, align) (addr + (align - 1)) & ~(align - 1)
 
-#define X86_PG_V  0x01
-#define X86_PG_PS 0x80
-
-#define PG_FRAME (0xffffffffff000ul)
-
-//thanks idlesauce!
-//https://github.com/ps5-payload-dev/sdk/blob/f5d40f02770e9b0001dd9e18056eca70b3da8b40/crt/kernel_procio.c#L32
-int
-k_proc_getpaddr(int pid, unsigned long vaddr, unsigned long* paddr,
-		     unsigned long* plen) {
-  unsigned long table_offset;
-  unsigned long table_index;
-  unsigned long vmspace;
-  unsigned long pml4u;
-  unsigned long proc;
-  unsigned long cr3;
-  unsigned long pte;
-
-  if(!KERNEL_OFFSET_VMSPACE_VM_PMAP) {
-    return -1;
-  }
-  if(!(proc=kernel_get_proc(pid))) {
-    return -1;
-  }
-
-  if(kernel_copyout(proc + KERNEL_OFFSET_PROC_P_VMSPACE,
-		    &vmspace, sizeof(vmspace))) {
-    return -1;
-  }
-  if(kernel_copyout(vmspace + KERNEL_OFFSET_VMSPACE_VM_PMAP + 0x20,
-		    &pml4u, sizeof(pml4u))) {
-    return -1;
-  }
-  if(kernel_copyout(vmspace + KERNEL_OFFSET_VMSPACE_VM_PMAP + 0x28,
-		    &cr3, sizeof(cr3))) {
-    return -1;
-  }
-
-  pte = cr3;
-  for(long bitpos=39; bitpos>=12; bitpos-=9) {
-    table_index = (vaddr >> bitpos) & ((1ull << 9) - 1);
-    table_offset = table_index * 8;
-    pte &= PG_FRAME;
-
-    if(kernel_copyout(pml4u-cr3 + table_offset + pte, &pte, sizeof(pte))) {
-      return -1;
-    }
-
-    // check entry validity
-    if(!(pte & X86_PG_V)) {
-      return -1;
-    }
-
-    // check if the entry is flagged as large or if we reached the last level
-    if((pte & X86_PG_PS) || bitpos == 12) {
-      *paddr = pte;
-      *paddr &= (1ul << 52) - (1ul << bitpos);
-      *paddr |= vaddr & ((1ul << bitpos) - 1);
-      *plen = (*paddr | ((1ul << bitpos) - 1)) + 1 - *paddr;
-      return 0;
-    }
-  }
-
-  return -1;
-}
-
-
+//https://github.com/ufm42/kexp/blob/00623847b4974a769e3111272964d2e672a5e8ce/src/kernel.c#L97
 void find_size(size_t *ksize) {
   char data[0x50];
 
@@ -95,7 +29,6 @@ void find_size(size_t *ksize) {
     vaddr += 0x1000;
   }
 
-  //log("find kmdp completed !!");
 }
 
 int main() {
