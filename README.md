@@ -9,4 +9,4 @@ dumps ps5 kernel after hv defeat
 
 thanks to the devs who gave me advice
 
-idlesauce, byepervisor, sb, echostrech
+ufm42, idlesauce, byepervisor, sb, echostrech
