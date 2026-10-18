@@ -47,9 +47,6 @@ int main() {
     
     toast("kdump","dumping kernel...");
     
-    kernel_set_ucred_authid(getpid(), 0x4800000000000007);
-    kernel_set_proc_rootdir(getpid(), kernel_get_root_vnode());
-    
     uint16_t fw =  kernel_get_fw_version() >> 16;
     printf("Firmware Version: %04x\n", fw);
     notify("dumping kernel to usb. please wait...");
