@@ -4,10 +4,11 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <string.h>
 #include "util.h"
 #include "icon_svg.h"
 
-
+#define ALIGN_UP(addr, align) (addr + (align - 1)) & ~(align - 1)
 
 #define X86_PG_V  0x01
 #define X86_PG_PS 0x80
@@ -75,6 +76,28 @@ k_proc_getpaddr(int pid, unsigned long vaddr, unsigned long* paddr,
   return -1;
 }
 
+
+void find_size(size_t *ksize) {
+  char data[0x50];
+
+  uintptr_t vaddr = ALIGN_UP(KERNEL_ADDRESS_ALLPROC, 0x1000);
+  while (1) {
+    kernel_copyout(vaddr, data, sizeof(data));
+
+    // Module info is at the end.
+    if (strcmp(data + 0x08, "kernel") == 0 &&
+        strcmp(data + 0x18, "elf kernel") == 0) {
+
+      *ksize = *(uintptr_t *)(data + 0x40);
+      break;
+    }
+
+    vaddr += 0x1000;
+  }
+
+  //log("find kmdp completed !!");
+}
+
 int main() {
     
     
@@ -97,6 +120,11 @@ int main() {
     uint16_t fw =  kernel_get_fw_version() >> 16;
     printf("Firmware Version: %04x\n", fw);
     notify("dumping kernel to usb. please wait...");
+    
+    size_t ksize = 0;
+    find_size(&ksize);
+    printf("ksize: %lx\n", ksize);
+    
     asprintf(&dest_path, "/mnt/usb0/PS5/kernel_%04x.bin", fw);
     
     int dest_fd = open(dest_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
@@ -104,9 +132,9 @@ int main() {
     uint64_t end = 0;
     for(uint64_t vaddr = KERNEL_ADDRESS_TEXT_BASE;;vaddr += sizeof(buf)){
         
-        unsigned long paddr = 0;
-        unsigned long plen = 0;
-        if (k_proc_getpaddr(0, vaddr, &paddr, &plen)){
+
+        uint64_t kend = KERNEL_ADDRESS_TEXT_BASE + ksize;
+        if (vaddr > kend){
             break;
         }
         if(kernel_copyout(vaddr, &buf, sizeof(buf))){
@@ -125,7 +153,7 @@ int main() {
     dest_path = NULL;
     
     
-    printf("kernel size: %lumb\n", (end+sizeof(buf) - KERNEL_ADDRESS_TEXT_BASE)/(1024*1024));//mb
+    printf("kernel size: %lumb\n", (end - KERNEL_ADDRESS_TEXT_BASE)/(1024*1024));//mb
     notify("done!");
     
     
