@@ -38,6 +38,6 @@ jobs:
           gh release create latest \
             --title "Build ${{ steps.sha.outputs.short }}" \
             --notes "Automated build from commit ${{ github.sha }}" \
-            kdump.elf \
+            kdump-ps5.elf \
         env:
           GH_TOKEN: ${{ github.token }}
